@@ -1,71 +1,36 @@
 import geopandas as gpd
-import matplotlib.pyplot as plt
 from pathlib import Path
 
-# -----------------------------
-# Paths
-# -----------------------------
-DATA_DIR = Path("data")
-OUTPUT_DIR = Path("output")
-OUTPUT_DIR.mkdir(exist_ok=True)
+from datareader import DataReader
+from csv_generator import CSVGenerator
+from plot_generator import PlotGenerator
 
-COUNTRIES_PATH = DATA_DIR / "countries" / "ne_110m_admin_0_countries.shp"
-CITIES_PATH = DATA_DIR / "cities" / "ne_110m_populated_places.shp"
 
-# -----------------------------
-# Load data
-# -----------------------------
-countries = gpd.read_file(COUNTRIES_PATH)
-cities = gpd.read_file(CITIES_PATH)
+
+# Directories
+data_dir = Path("data")
+output_dir = Path("output")
+
+# Initialize helpers
+reader = DataReader(data_dir)
+csv_generator = CSVGenerator(output_dir)
+plot_generator = PlotGenerator()
+
+# Read data
+countries = reader.read_countries()
+cities = reader.read_cities()
 
 print(f"Loaded {len(countries)} countries")
 print(f"Loaded {len(cities)} cities")
 
-# -----------------------------
 # Spatial join
-# -----------------------------
-joined = gpd.sjoin(
-    cities,
-    countries,
-    how="left",
-    predicate="within"
-)
+joined = gpd.sjoin(cities, countries, how="left", predicate="within")
 
 print("Spatial join completed")
 print(joined.head())
 
-# -----------------------------
-# Save to CSV
-# -----------------------------
-joined_csv = joined.copy()
+# Save result to CSV
+csv_generator.save(gdf=joined, filename="cities_with_countries.csv")
 
-# Convert geometry to WKT so it can be stored in CSV
-joined_csv["geometry"] = joined_csv["geometry"].apply(
-    lambda geom: geom.wkt if geom is not None else None
-)
-
-csv_path = OUTPUT_DIR / "cities_with_countries.csv"
-joined_csv.to_csv(csv_path, index=False)
-
-print(f"CSV saved to {csv_path}")
-
-# -----------------------------
-# Plot result
-# -----------------------------
-ax = countries.plot(
-    color="lightgrey",
-    edgecolor="black",
-    figsize=(12, 7)
-)
-
-cities.plot(
-    ax=ax,
-    color="red",
-    markersize=5,
-    alpha=0.7
-)
-
-ax.set_title("Cities and Countries (GeoPandas Spatial Join)")
-ax.set_axis_off()
-
-plt.show()
+# Plot
+plot_generator.plot_countries_and_cities(countries=countries, cities=cities, title="Cities and Countries (GeoPandas Spatial Join)")
